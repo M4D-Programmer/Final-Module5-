@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Local Car Lot — Marketplace</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="header-left">
+        <a class="brand" href="#">Local Car Lot</a>
+      </div>
+      <nav class="nav">
+        <a href="#">Home</a>
+        <a class="active" href="#inventory">Find your car</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-image"></div>
+      <div class="hero-overlay"></div>
+      <div class="container hero-inner">
+        <h1 class="hero-title">Browse our cars</h1>
+        <p class="hero-sub">Premium local dealership listings — clean, curated, and easy to browse.</p>
+
+        <div class="searchbar">
+          <div class="search-input">
+            <input id="q" type="search" placeholder="Search by Make, Model or Keyword" aria-label="Search inventory" autocomplete="off" aria-autocomplete="list" aria-controls="suggestionList">
+            <div id="suggestionList" class="suggestions" role="listbox" aria-label="Search suggestions"></div>
+            <button id="searchBtn" class="search-btn" aria-label="Search">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 21l-4.35-4.35" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11" r="6" stroke="#fff" stroke-width="2"/></svg>
+            </button>
+          </div>
+
+          <select id="makeFilter" aria-label="Filter by make">
+            <option value="">All Makes</option>
+          </select>
+          <select id="bodyFilter" aria-label="Filter by body type">
+            <option value="">Any Body</option>
+          </select>
+          <select id="transFilter" aria-label="Filter by transmission">
+            <option value="">Any Transmission</option>
+            <option value="Automatic">Automatic</option>
+            <option value="Manual">Manual</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section id="inventory" class="inventory-wrap">
+      <div class="container inventory-section">
+        <div class="inventory-top">
+          <h2>Search results</h2>
+          <div class="controls-right">
+            <div class="price-filter">
+              <label>Price range: <span id="priceRangeLabel">$0 — $100,000</span></label>
+              <div class="range-wrap">
+                <input id="rangeMin" type="range" min="0" max="100000" step="500" value="0">
+                <input id="rangeMax" type="range" min="0" max="100000" step="500" value="100000">
+              </div>
+            </div>
+            <select id="sort" aria-label="Sort">
+              <option value="relevance">Relevance</option>
+              <option value="a-to-z">A to Z</option>
+              <option value="z-to-a">Z to A</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="newest">Newest</option>
+            </select>
+          </div>
+        </div>
+
+          <div id="grid" class="grid"></div>
+          <template id="cardTpl">
+            <article class="card">
+              <img class="thumb" src="" alt="" loading="lazy">
+              <div class="card-body">
+                <h3 class="title"></h3>
+                <p class="meta"></p>
+                <div class="specs"></div>
+                <div class="details-row">
+                  <p class="price"></p>
+                  <button class="details">View</button>
+                </div>
+              </div>
+            </article>
+          </template>
+    </section>
+
+    <section id="contact" class="container contact">
+      <h2>Contact Local Car Lot</h2>
+      <form id="contactForm">
+        <input placeholder="Your name" required>
+        <input placeholder="Email" type="email" required>
+        <textarea placeholder="Message" required></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">© Local Car Lot — Built with care</div>
+  </footer>
+
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal-panel">
+      <button id="closeModal" class="modal-close">×</button>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script src="js/app.js" type="module"></script>
+</body>
+</html>
