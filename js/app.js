@@ -1,150 +1,120 @@
-const dataUrl = './data/cars.json'
-
 const q = document.getElementById('q')
-const makeFilter = document.getElementById('makeFilter')
-const transFilter = document.getElementById('transFilter')
 const grid = document.getElementById('grid')
 const cardTpl = document.getElementById('cardTpl')
 const modal = document.getElementById('modal')
 const modalContent = document.getElementById('modalContent')
 const closeModal = document.getElementById('closeModal')
-const rangeMin = document.getElementById('rangeMin')
-const rangeMax = document.getElementById('rangeMax')
-const priceRangeLabel = document.getElementById('priceRangeLabel')
 const sortSelect = document.getElementById('sort')
 const suggestionList = document.getElementById('suggestionList')
 const searchBtn = document.getElementById('searchBtn')
 
-let cars = []
+
+//const API_BASE = 'https://www.omdbapi.com/?apikey=2f6b511a'
+const DEFAULT_QUERY = 'star'
+let movies = []
+let suggestionItems = []
+let activeSuggestion = -1
 
 async function init(){
-  const res = await fetch(dataUrl)
-  cars = await res.json()
-  setupPriceRanges()
-  populateMakes()
-  populateSuggestions()
-  render(cars)
-}
-
-function setupPriceRanges(){
-  const prices = cars.map(c=>c.price)
-  const min = Math.min(...prices)
-  const max = Math.max(...prices)
-  rangeMin.min = min; rangeMin.max = max; rangeMin.value = min
-  rangeMax.min = min; rangeMax.max = 50000; rangeMax.value = max
-  updatePriceLabel()
-}
-
-function updatePriceLabel(){
-  const a = Number(rangeMin.value)
-  const b = Number(rangeMax.value)
-  priceRangeLabel.textContent = `$${a.toLocaleString()} — $${b.toLocaleString()}`
-}
-
-function populateMakes(){
-  const makes = Array.from(new Set(cars.map(c=>c.make))).sort()
-  for(const m of makes){
-    const o = document.createElement('option')
-    o.value = m; o.textContent = m
-    makeFilter.appendChild(o)
-  }
+  await applyFilters() // initial render: uses default query
 }
 
 function populateSuggestions(){
-  const items = Array.from(new Set(cars.flatMap(c=>[c.make,c.model,c.location]))).slice(0,200)
-  suggestionItems = items
+  const items = new Set()
+  for(const m of movies){ if(m.Title) items.add(m.Title) }
+  suggestionItems = Array.from(items).slice(0,300)
 }
 
 function render(list){
   grid.innerHTML = ''
-  for(const car of list){
-    const node = cardTpl.content.cloneNode(true)
-    node.querySelector('.thumb').src = car.img
-    node.querySelector('.thumb').alt = `${car.make} ${car.model}`
-    node.querySelector('.title').textContent = `${car.year} ${car.make} ${car.model}`
-    node.querySelector('.meta').textContent = `${car.mileage.toLocaleString()} mi — ${car.location}`
-    const specs = node.querySelector('.specs')
-    if(specs) specs.innerHTML = `\
-      <span class="spec">${iconMileage()} ${car.mileage.toLocaleString()} mi</span>\
-      <span class="spec">${iconBody()} ${car.body}</span>\
-      <span class="spec">${iconTrans()} ${car.transmission}</span>`
-    node.querySelector('.price').textContent = `$${car.price.toLocaleString()}`
-    node.querySelector('.details').addEventListener('click', ()=>openModal(car))
-    grid.appendChild(node)
-  }
-}
-
-
-let suggestionItems = []
-
-searchBtn?.addEventListener('click', (e)=>{
-  e.preventDefault()
-  const qv = q.value.trim()
-  if(!qv) return
-  movieSearch(qv)
-})
-
-q.addEventListener('keydown', (e)=>{
-  if(e.key==='Enter'){
-    e.preventDefault()
-    const qv = q.value.trim()
-    if(qv) movieSearch(qv)
-  }
-})
-
-async function apiSearch(query) {
-  try {
-    const response = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&apikey=2f6b511a`)
-    const data = await response.json()
-    if (data && data.Response === "True" && Array.isArray(data.Search)) {
-      return data.Search
-    }
-    return []
-  } catch (error) {
-    console.error('Error fetching suggestions:', error)
-    return []
-  }
-}
-
-async function movieSearch(query){
-  const results = await apiSearch(query)
-  if(!results || !results.length){
-    grid.innerHTML = `<p style="color:var(--muted)">No movies found for "${query}".</p>`
-    return
-  }
-  renderMovies(results)
-}
-
-function renderMovies(list){
-  grid.innerHTML = ''
+  if(!list.length){ grid.innerHTML = `<p style="color:var(--muted)">No results.</p>`; return }
   for(const m of list){
     const node = cardTpl.content.cloneNode(true)
-    const poster = (m.Poster && m.Poster!=='N/A')? m.Poster : ''
-    node.querySelector('.thumb').src = poster
+    const img = (m.Poster && m.Poster !== 'N/A') ? m.Poster : ''
+    node.querySelector('.thumb').src = img
     node.querySelector('.thumb').alt = m.Title
     node.querySelector('.title').textContent = `${m.Title} (${m.Year})`
     node.querySelector('.meta').textContent = `${m.Type || ''}`
     const specs = node.querySelector('.specs')
     if(specs) specs.innerHTML = ''
     node.querySelector('.price').textContent = ''
-    node.querySelector('.details').addEventListener('click', ()=> openMovieModal(m))
+    node.querySelector('.details').addEventListener('click', ()=> openMovieModalById(m.imdbID))
     grid.appendChild(node)
   }
 }
 
-function openMovieModal(m){
-  modalContent.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-      <img src="${(m.Poster && m.Poster!=='N/A')?m.Poster:''}" style="width:100%;height:250px;object-fit:cover;border-radius:6px" alt="${m.Title}">
-      <div>
-        <h3 style="margin-top:0">${m.Title} (${m.Year})</h3>
-        <p style="color:var(--muted)">${m.Type}</p>
-        <p>IMDB ID: ${m.imdbID}</p>
+async function openMovieModalById(id){
+  try{
+    const res = await fetch(`https://www.omdbapi.com/?i=${encodeURIComponent(id)}&apikey=2f6b511a`)
+    const d = await res.json()
+    if(!d || d.Response==='False'){
+      modalContent.innerHTML = `<p style="color:var(--muted)">Details unavailable.</p>`
+      modal.setAttribute('aria-hidden','false')
+      return
+    }
+    modalContent.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <img src="${(d.Poster && d.Poster!=='N/A')?d.Poster:''}" style="width:100%;height:250px;object-fit:cover;border-radius:6px" alt="${d.Title}">
+        <div>
+          <h3 style="margin-top:0">${d.Title} (${d.Year})</h3>
+          <p style="color:var(--muted)">Director: ${d.Director} • Actors: ${d.Actors}</p>
+          <p style="font-weight:700;color:var(--accent);font-size:1.1rem">IMDB: ${d.imdbRating || 'N/A'}</p>
+          <p>${d.Plot}</p>
+        </div>
       </div>
-    </div>
-  `
-  modal.setAttribute('aria-hidden','false')
+    `
+    modal.setAttribute('aria-hidden','false')
+  }catch(err){
+    console.error(err)
+    modalContent.innerHTML = `<p style="color:var(--muted)">Failed to load details.</p>`
+    modal.setAttribute('aria-hidden','false')
+  }
 }
+
+closeModal.addEventListener('click', ()=> modal.setAttribute('aria-hidden','true'))
+modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.setAttribute('aria-hidden','true') })
+
+async function fetchSearch(query){
+  const qStr = (query || DEFAULT_QUERY).trim() || DEFAULT_QUERY
+  try{
+    const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(qStr)}&apikey=2f6b511a`)
+    const d = await res.json()
+    if(d && d.Response==='True' && Array.isArray(d.Search)) return d.Search
+    return []
+  }catch(err){ console.error(err); return [] }
+}
+
+async function applyFilters(){
+  const qv = (q.value || '').trim()
+  movies = await fetchSearch(qv)
+  populateSuggestions()
+  const s = sortSelect.value
+  if(s==='a-to-z') movies.sort((a,b)=> (a.Title||'').localeCompare(b.Title||''))
+  else if(s==='z-to-a') movies.sort((a,b)=> (b.Title||'').localeCompare(a.Title||''))
+  else if(s==='newest') movies.sort((a,b)=> Number(b.Year || 0) - Number(a.Year || 0))
+  // relevance: keep API order
+  render(movies)
+}
+
+searchBtn?.addEventListener('click', (e)=>{ e.preventDefault(); applyFilters() })
+q.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); applyFilters() } })
+
+q.addEventListener('input', debounce(()=>{
+  const val = q.value.trim().toLowerCase()
+  suggestionList.innerHTML = ''
+  if(val.length<2){ suggestionList.style.display='none'; applyFilters(); return }
+  const matches = suggestionItems.filter(it=>it.toLowerCase().includes(val)).slice(0,8)
+  if(!matches.length){ suggestionList.style.display='none'; applyFilters(); return }
+  suggestionList.style.display='block'
+  for(const m of matches){
+    const d = document.createElement('div')
+    d.className = 'item'
+    d.textContent = m
+    suggestionList.appendChild(d)
+  }
+  activeSuggestion = -1
+  applyFilters()
+},200))
 
 suggestionList.addEventListener('click', (e)=>{
   const it = e.target.closest('.item')
@@ -154,6 +124,9 @@ suggestionList.addEventListener('click', (e)=>{
   suggestionList.style.display='none'
   applyFilters()
 })
+
+// apply filters when sort changes
+sortSelect?.addEventListener('change', applyFilters)
 
 q.addEventListener('keydown', (e)=>{
   const items = Array.from(suggestionList.querySelectorAll('.item'))
@@ -165,57 +138,8 @@ q.addEventListener('keydown', (e)=>{
 
 function updateActive(items){ items.forEach(it=>it.classList.remove('active')); if(activeSuggestion>=0) items[activeSuggestion].classList.add('active') }
 
-function iconMileage(){return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 7v5l3 3" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
-function iconBody(){return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="7" width="18" height="9" rx="2" stroke="#9CA3AF" stroke-width="1.5"/></svg>`}
-function iconTrans(){return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 7v10" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round"/><path d="M16 7v10" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round"/></svg>`}
-
-function openModal(car){
-  modalContent.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-      <img src="${car.img}" style="width:100%;height:250px;object-fit:cover;border-radius:6px" alt="${car.make} ${car.model}">
-      <div>
-        <h3 style="margin-top:0">${car.year} ${car.make} ${car.model}</h3>
-        <p style="color:var(--muted)">${car.mileage.toLocaleString()} mi • ${car.location}</p>
-        <p style="font-weight:700;color:var(--accent);font-size:1.1rem">$${car.price.toLocaleString()}</p>
-        <p>${car.description}</p>
-        <ul>${car.features.map(f=>`<li>${f}</li>`).join('')}</ul>
-      </div>
-    </div>
-  `
-  modal.setAttribute('aria-hidden','false')
-}
-
-closeModal.addEventListener('click', ()=> modal.setAttribute('aria-hidden','true'))
-modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.setAttribute('aria-hidden','true') })
-
-function applyFilters(){
-  const qv = q.value.trim().toLowerCase()
-  const make = makeFilter.value
-  const trans = transFilter.value
-  const minP = Number(rangeMin.value)
-  const maxP = Number(rangeMax.value)
-  let result = cars.slice()
-  if(qv) result = result.filter(c=>`${c.make} ${c.model} ${c.location}`.toLowerCase().includes(qv))
-  if(make) result = result.filter(c=>c.make===make)
-  if(trans) result = result.filter(c=>c.transmission===trans)
-  result = result.filter(c=>c.price>=minP && c.price<=maxP)
-  // sorting
-  const s = sortSelect.value
-  if(s==='price-asc') result.sort((a,b)=>a.price-b.price)
-  if(s==='a-to-z') result.sort((a,b)=>a.make.localeCompare(b.make) || a.model.localeCompare(b.model))
-  if(s==='z-to-a') result.sort((a,b)=>b.make.localeCompare(a.make) || b.model.localeCompare(a.model))
-  if(s==='price-desc') result.sort((a,b)=>b.price-a.price)
-  if(s==='newest') result.sort((a,b)=>b.year-a.year)
-  render(result)
-}
-
-q.addEventListener('input', debounce(applyFilters,200))
-makeFilter.addEventListener('change', applyFilters)
-transFilter.addEventListener('change', applyFilters)
-rangeMin.addEventListener('input', ()=>{ if(Number(rangeMin.value)>Number(rangeMax.value)){rangeMin.value=rangeMax.value} updatePriceLabel(); applyFilters() })
-rangeMax.addEventListener('input', ()=>{ if(Number(rangeMax.value)<Number(rangeMin.value)){rangeMax.value=rangeMin.value} updatePriceLabel(); applyFilters() })
-sortSelect.addEventListener('change', applyFilters)
-
 function debounce(fn,ms=200){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 
-init().catch(err=>{console.error(err);grid.innerHTML='<p style="color:var(--muted)">Failed to load inventory.</p>'})
+function truncate(s,n){ if(!s) return ''; return s.length>n? s.slice(0,n).trim()+'…': s }
+
+init().catch(err=>{console.error(err); grid.innerHTML='<p style="color:var(--muted)">Failed to load movies.</p>'})
