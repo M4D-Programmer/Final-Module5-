@@ -13,6 +13,7 @@ const rangeMax = document.getElementById('rangeMax')
 const priceRangeLabel = document.getElementById('priceRangeLabel')
 const sortSelect = document.getElementById('sort')
 const suggestionList = document.getElementById('suggestionList')
+const searchBtn = document.getElementById('searchBtn')
 
 let cars = []
 
@@ -73,18 +74,77 @@ function render(list){
   }
 }
 
-// Autocomplete suggestions
-let suggestionItems = []
-let activeSuggestion = -1
 
-q.addEventListener('input', ()=>{
-  const v = q.value.trim().toLowerCase()
-  if(!v){ suggestionList.innerHTML=''; suggestionList.style.display='none'; return }
-  const matches = suggestionItems.filter(s=>s.toLowerCase().includes(v)).slice(0,8)
-  suggestionList.innerHTML = matches.map((m,i)=>`<div class="item" role="option" data-index="${i}">${m}</div>`).join('')
-  suggestionList.style.display = matches.length? 'block':'none'
-  activeSuggestion = -1
+let suggestionItems = []
+
+searchBtn?.addEventListener('click', (e)=>{
+  e.preventDefault()
+  const qv = q.value.trim()
+  if(!qv) return
+  movieSearch(qv)
 })
+
+q.addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){
+    e.preventDefault()
+    const qv = q.value.trim()
+    if(qv) movieSearch(qv)
+  }
+})
+
+async function apiSearch(query) {
+  try {
+    const response = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&apikey=2f6b511a`)
+    const data = await response.json()
+    if (data && data.Response === "True" && Array.isArray(data.Search)) {
+      return data.Search
+    }
+    return []
+  } catch (error) {
+    console.error('Error fetching suggestions:', error)
+    return []
+  }
+}
+
+async function movieSearch(query){
+  const results = await apiSearch(query)
+  if(!results || !results.length){
+    grid.innerHTML = `<p style="color:var(--muted)">No movies found for "${query}".</p>`
+    return
+  }
+  renderMovies(results)
+}
+
+function renderMovies(list){
+  grid.innerHTML = ''
+  for(const m of list){
+    const node = cardTpl.content.cloneNode(true)
+    const poster = (m.Poster && m.Poster!=='N/A')? m.Poster : ''
+    node.querySelector('.thumb').src = poster
+    node.querySelector('.thumb').alt = m.Title
+    node.querySelector('.title').textContent = `${m.Title} (${m.Year})`
+    node.querySelector('.meta').textContent = `${m.Type || ''}`
+    const specs = node.querySelector('.specs')
+    if(specs) specs.innerHTML = ''
+    node.querySelector('.price').textContent = ''
+    node.querySelector('.details').addEventListener('click', ()=> openMovieModal(m))
+    grid.appendChild(node)
+  }
+}
+
+function openMovieModal(m){
+  modalContent.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <img src="${(m.Poster && m.Poster!=='N/A')?m.Poster:''}" style="width:100%;height:250px;object-fit:cover;border-radius:6px" alt="${m.Title}">
+      <div>
+        <h3 style="margin-top:0">${m.Title} (${m.Year})</h3>
+        <p style="color:var(--muted)">${m.Type}</p>
+        <p>IMDB ID: ${m.imdbID}</p>
+      </div>
+    </div>
+  `
+  modal.setAttribute('aria-hidden','false')
+}
 
 suggestionList.addEventListener('click', (e)=>{
   const it = e.target.closest('.item')
